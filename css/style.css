@@ -1,0 +1,435 @@
+* {
+  box-sizing: border-box;
+  font-family: 'Inter', sans-serif;
+}
+
+body {
+  margin: 0;
+  background: #0b0f14;
+  color: #e5e7eb;
+}
+
+/* GLASS */
+.glass {
+  background: rgba(255,255,255,0.06);
+  backdrop-filter: blur(18px) saturate(180%);
+  border: 1px solid rgba(255,255,255,0.12);
+  border-radius: 18px;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+}
+
+/* TOP BAR */
+.topbar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 60px;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  padding: 0 20px;
+  z-index: 1000;
+}
+
+
+.hamburger {
+  position: absolute;
+  left: 20px;
+  font-size: 22px;
+  cursor: pointer;
+}
+
+.container {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 110px 20px 30px; /* ⬅ intentional gap */
+}
+
+
+/* PLAYER CARD */
+.player-card {
+  padding: 24px;
+  margin-bottom: 25px;
+}
+
+.player-name {
+  text-align: center;
+  margin-bottom: 20px;
+}
+
+.player-content {
+  display: flex;
+  gap: 20px;
+}
+
+.player-photo {
+  height: 180px;
+  width: 180px;
+  background: rgba(255,255,255,0.08);
+  border-radius: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #9ca3af;
+}
+
+.player-right {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.stat label {
+  font-size: 13px;
+  color: #9ca3af;
+}
+
+.stat span {
+  font-size: 16px;
+}
+
+.base-price {
+  margin-top: 20px;
+  text-align: center;
+  font-size: 18px;
+  font-weight: 600;
+  color: #0a84ff;
+}
+
+/* TEAMS */
+.teams-section {
+  padding: 24px;
+  margin-bottom: 25px;
+}
+
+.teams-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+  margin: 15px 0;
+}
+
+.team-btn {
+  padding: 12px;
+  border-radius: 12px;
+  background: rgba(255,255,255,0.08);
+  border: 1px solid rgba(255,255,255,0.15);
+  color: white;
+}
+
+.bid-box input {
+  width: 100%;
+  padding: 10px;
+  border-radius: 10px;
+  border: none;
+  background: rgba(255,255,255,0.1);
+  color: white;
+}
+
+.action-buttons {
+  display: flex;
+  gap: 12px;
+  margin-top: 20px;
+}
+
+.sold-btn {
+  flex: 1;
+  background: #0a84ff;
+  border: none;
+  padding: 12px;
+  border-radius: 12px;
+  color: white;
+  font-weight: 600;
+}
+
+.unsold-btn {
+  flex: 1;
+  background: transparent;
+  border: 1px solid rgba(255,255,255,0.3);
+  padding: 12px;
+  border-radius: 12px;
+  color: white;
+}
+
+/* TABLE */
+.table-section {
+  padding: 24px;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+th, td {
+  padding: 12px;
+}
+
+th {
+  color: #9ca3af;
+}
+
+/* SELECTED TEAM */
+.team-btn.selected {
+  border-color: #0a84ff;
+  background: rgba(10, 132, 255, 0.25);
+  box-shadow: 0 0 0 1px rgba(10, 132, 255, 0.4);
+}
+/* DISABLED TEAM */
+.team-btn.disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  pointer-events: none;
+  border-color: rgba(255,255,255,0.2);
+}
+/* SOLD BADGE */
+.sold-badge {
+  position: absolute;
+  top: 80px;
+  right: 30px;
+  padding: 6px 14px;
+  border-radius: 999px;
+  font-weight: 600;
+  font-size: 14px;
+  background: rgba(10, 132, 255, 0.85);
+  backdrop-filter: blur(12px);
+  color: white;
+}
+
+.sold-info {
+  text-align: center;
+  margin-top: 8px;
+  font-size: 14px;
+  color: #9ca3af;
+}
+
+.hidden {
+  display: none;
+}
+/* HAMBURGER ICON */
+.hamburger {
+  position: absolute;
+  left: 20px;
+  font-size: 22px;
+  cursor: pointer;
+  user-select: none;
+  color: #ffffff;
+}
+/* SIDE MENU */
+.side-menu {
+  position: fixed;
+  top: 60px; /* below topbar */
+  left: 0;
+  width: 240px;
+  height: calc(100vh - 60px);
+  background: rgba(20, 22, 30, 0.95);
+  backdrop-filter: blur(18px);
+  padding: 20px;
+  z-index: 999;
+}
+
+.side-menu button {
+  width: 100%;
+  padding: 14px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.08);
+  border: none;
+  color: #ffffff;
+  font-size: 15px;
+  cursor: pointer;
+}
+
+.side-menu button:hover {
+  background: rgba(255, 255, 255, 0.15);
+}
+/* PLAYERS PAGE */
+.players-page {
+  margin-top: 30px;
+}
+
+.players-page table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.players-page th,
+.players-page td {
+  padding: 12px;
+  text-align: left;
+  color: #ffffff;
+}
+
+.players-page th {
+  font-weight: 600;
+  opacity: 0.7;
+}
+
+.players-page tr:not(:last-child) {
+  border-bottom: 1px solid rgba(255,255,255,0.1);
+}
+.hidden {
+  display: none !important;
+}
+.players-page td:nth-child(3) {
+  font-weight: 600;
+}
+
+.players-page td:nth-child(3):contains("SOLD") {
+  color: #0a84ff;
+}
+.menu-link {
+  display: block;
+  padding: 14px;
+  border-radius: 12px;
+  background: rgba(255,255,255,0.08);
+  color: #fff;
+  text-decoration: none;
+  text-align: center;
+  font-size: 15px;
+}
+
+.menu-link:hover {
+  background: rgba(255,255,255,0.15);
+}
+.back-btn {
+  position: absolute;
+  left: 20px;
+  color: #fff;
+  text-decoration: none;
+  font-size: 15px;
+}
+
+.back-btn:hover {
+  opacity: 0.8;
+}
+.side-menu {
+  transform: translateX(-100%);
+  transition: transform 0.3s ease;
+}
+
+.side-menu:not(.hidden) {
+  transform: translateX(0);
+}
+.menu-divider {
+  height: 1px;
+  background: rgba(255,255,255,0.15);
+  margin: 16px 0;
+}
+@keyframes soldGlow {
+  0% {
+    box-shadow: 0 0 0 rgba(10,132,255,0);
+    transform: scale(1);
+  }
+  50% {
+    box-shadow: 0 0 30px rgba(10,132,255,0.9);
+    transform: scale(1.08);
+  }
+  100% {
+    box-shadow: 0 0 0 rgba(10,132,255,0);
+    transform: scale(1);
+  }
+}
+
+.sold-animate {
+  animation: soldGlow 1.2s ease-in-out;
+}
+.fullscreen-btn {
+  position: absolute;
+  right: 20px;
+  cursor: pointer;
+  font-size: 18px;
+  color: #fff;
+}
+/* LOGIN PAGE */
+.login-container {
+  max-width: 360px;
+  margin: 120px auto;
+  padding: 30px;
+  text-align: center;
+}
+
+.login-container h2 {
+  margin-bottom: 20px;
+}
+
+.login-container input {
+  width: 100%;
+  padding: 12px;
+  margin-bottom: 12px;
+  border-radius: 10px;
+  border: none;
+  background: rgba(255,255,255,0.08);
+  color: #fff;
+}
+
+.login-container button {
+  width: 100%;
+  padding: 12px;
+  border-radius: 10px;
+  border: none;
+  background: #0a84ff;
+  color: #fff;
+  cursor: pointer;
+  margin-top: 10px;
+}
+
+.login-links {
+  margin-top: 15px;
+}
+
+.login-links a {
+  display: block;
+  margin-top: 6px;
+  color: #9ca3af;
+  text-decoration: none;
+  font-size: 14px;
+}
+
+.login-error {
+  margin-top: 10px;
+  color: #ff6b6b;
+}
+.logout-btn {
+  position: absolute;
+  right: 60px;
+  background: transparent;
+  border: none;
+  color: #fff;
+  cursor: pointer;
+}
+.public-links {
+  text-align: center;
+  margin-top: 20px;
+}
+
+.public-links a {
+  display: block;
+  margin-top: 8px;
+  color: #9ca3af;
+  text-decoration: none;
+  font-size: 14px;
+}
+
+.public-links a:hover {
+  color: #ffffff;
+}
+
+.player-photo {
+  width: 140px;
+  height: 180px;
+  border-radius: 12px;
+
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  color: #9ca3af;
+  font-size: 14px;
+}

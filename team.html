@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Team | Champions Trophy Auction</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+
+  <!-- TOP BAR -->
+  <header class="topbar glass">
+    <a href="#" class="back-btn" id="backBtn">← Back</a>
+    <h1 id="teamName">Team</h1>
+  </header>
+
+  <main class="container">
+
+    <section class="glass">
+      <button id="exportBtn">⬇ Export Auction Result</button>
+    </section>
+
+    <section class="glass">
+      <table>
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>Player</th>
+            <th>Price</th>
+          </tr>
+        </thead>
+        <tbody id="teamPlayersBody">
+          <!-- Loaded from Firebase -->
+        </tbody>
+      </table>
+    </section>
+
+  </main>
+
+<script type="module" src="js/firebase.js"></script>
+<script type="module" src="js/team.js"></script>
+
+
+  <!-- BACK NAV LOGIC -->
+  <script>
+    document.getElementById("backBtn").onclick = () => {
+      const from = sessionStorage.getItem("fromPage");
+      if (from === "index") {
+        window.location.href = "index.html";
+      } else {
+        window.location.href = "login.html";
+      }
+    };
+  </script>
+
+</body>
+</html>

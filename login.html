@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Admin Login | Champions Trophy Auction</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+
+  <!-- LOGIN CARD -->
+  <main class="login-container glass">
+    <h2>Admin Login</h2>
+
+    <input type="text" id="username" placeholder="Username" />
+    <input type="password" id="password" placeholder="Password" />
+
+    <button id="loginBtn">Login</button>
+
+    <p class="login-error hidden" id="loginError">Invalid credentials</p>
+  </main>
+
+  <!-- PUBLIC LINKS -->
+  <div class="public-links">
+    <a href="players.html"
+       onclick="sessionStorage.setItem('fromPage','login')">
+      View Players
+    </a>
+
+    <!-- TEAMS WILL LOAD HERE -->
+    <div id="loginTeams"></div>
+  </div>
+
+  <!-- AUTH -->
+  <script src="js/auth.js"></script>
+
+  <!-- LOAD TEAMS -->
+  <script type="module">
+    import { getDocs, collection } 
+      from "https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore.js";
+    import { db } from "./js/firebase.js";
+
+    const loginTeams = document.getElementById("loginTeams");
+
+    async function loadTeams() {
+      const snapshot = await getDocs(collection(db, "teams"));
+
+      snapshot.forEach(docSnap => {
+        const team = docSnap.data();
+
+        const link = document.createElement("a");
+        link.href = `team.html?id=${docSnap.id}`;
+        link.textContent = team.name;
+
+        link.onclick = () => {
+          sessionStorage.setItem("fromPage", "login");
+        };
+
+        loginTeams.appendChild(link);
+      });
+    }
+
+    loadTeams();
+  </script>
+
+</body>
+</html>

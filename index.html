@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>CHAMPIONS TROPHY 6.0 AUCTION</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+
+  <!-- TOP BAR -->
+  <header class="topbar glass">
+    <div class="hamburger">☰</div>
+    <div class="fullscreen-btn">⛶</div>
+    <button class="logout-btn">Logout</button>
+    <h1>CHAMPIONS TROPHY 6.0 AUCTION</h1>
+  </header>
+
+  <!-- SIDE MENU -->
+  <aside class="side-menu hidden" id="sideMenu">
+    <!-- Players -->
+    <a href="players.html"
+       class="menu-link"
+       onclick="sessionStorage.setItem('fromPage','index')">
+      Players
+    </a>
+
+    <div class="menu-divider"></div>
+
+    <!-- Teams (loaded dynamically by JS) -->
+    <div id="teamsMenu"></div>
+  </aside>
+
+  <main class="container">
+
+    <!-- PLAYER CARD -->
+    <section class="player-card glass">
+      <h2 class="player-name">Loading...</h2>
+
+      <!-- SOLD BADGE -->
+      <div class="sold-badge hidden" id="soldBadge">SOLD</div>
+      <div class="sold-info hidden" id="soldInfo">
+        <span id="soldTo"></span> • ₹<span id="soldPrice"></span>
+      </div>
+
+      <div class="player-content">
+        <div class="player-left">
+          <div class="player-photo">PHOTO</div>
+        </div>
+
+        <div class="player-right">
+          <div class="stat">
+            <label>Role</label>
+            <span>-</span>
+          </div>
+          <div class="stat">
+            <label>Batting</label>
+            <span>-</span>
+          </div>
+          <div class="stat">
+            <label>Bowling</label>
+            <span>-</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="base-price">Base Price: ₹0</div>
+    </section>
+
+    <!-- TEAM BID OPTIONS -->
+    <section class="teams-section glass">
+      <h3>Select Winning Team</h3>
+
+      <div class="teams-grid" id="teamsGrid">
+        <!-- Loaded from Firebase -->
+      </div>
+
+      <div class="bid-box">
+        <label>Enter Bid Amount</label>
+        <input
+  type="text"
+  id="bidInput"
+  placeholder="₹ Amount"
+  inputmode="numeric"
+  disabled
+/>
+
+      </div>
+
+      <div class="action-buttons">
+        <button class="sold-btn" disabled>SOLD & NEXT</button>
+        <button class="unsold-btn" disabled>UNSOLD & NEXT</button>
+      </div>
+    </section>
+
+    <!-- TEAM TABLE -->
+    <section class="table-section glass">
+      <h3>Teams Summary</h3>
+
+      <table>
+        <thead>
+          <tr>
+            <th>Team</th>
+            <th>Balance</th>
+            <th>Players</th>
+          </tr>
+        </thead>
+        <tbody id="teamsTableBody">
+          <!-- Loaded from Firebase -->
+        </tbody>
+      </table>
+    </section>
+
+  </main>
+
+  <!-- JS -->
+  <script type="module" src="js/firebase.js"></script>
+  <script type="module" src="js/auction.js"></script>
+
+  <!-- UI CONTROLS -->
+  <script>
+    // Hamburger toggle
+    document.querySelector(".hamburger").addEventListener("click", () => {
+      document.getElementById("sideMenu").classList.toggle("hidden");
+    });
+
+    // Logout
+    document.querySelector(".logout-btn").onclick = () => {
+      localStorage.removeItem("auctionAdmin");
+      window.location.href = "login.html";
+    };
+  </script>
+
+</body>
+</html>
