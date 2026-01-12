@@ -77,17 +77,18 @@
         <!-- Loaded from Firebase -->
       </div>
 
-      <div class="bid-box">
-        <label>Enter Bid Amount</label>
-        <input
-  type="text"
-  id="bidInput"
-  placeholder="₹ Amount"
-  inputmode="numeric"
-  disabled
-/>
+<div class="bid-box">
+  <label>Current Bid</label>
 
-      </div>
+  <div class="bid-display" id="bidDisplay">
+    ₹10,000
+  </div>
+
+  <button class="increment-btn" id="incrementBtn" disabled>
+    + ₹1,000
+  </button>
+</div>
+
 
       <div class="action-buttons">
         <button class="sold-btn" disabled>SOLD & NEXT</button>
@@ -135,3 +136,4 @@
 
 </body>
 </html>
+
