@@ -16,9 +16,6 @@ import { db } from "./firebase.js";
 ========================= */
 const TOTAL_PLAYERS = 9;
 const BASE_PRICE = 10000;
-const STEP_SMALL = 1000;
-const STEP_LARGE = 5000;
-const STEP_SWITCH_AT = 70000;
 const SOLD_DELAY = 5000;
 
 /* =========================
@@ -58,10 +55,16 @@ let currentPlayerData = null;
 let currentBid = BASE_PRICE;
 
 /* =========================
-   UTIL: UPDATE INCREMENT STEP
+   INCREMENT SLAB LOGIC
 ========================= */
+function getIncrementStep(bid) {
+  if (bid < 50000) return 2000;
+  if (bid < 100000) return 5000;
+  return 10000;
+}
+
 function updateIncrementButton() {
-  const step = currentBid >= STEP_SWITCH_AT ? STEP_LARGE : STEP_SMALL;
+  const step = getIncrementStep(currentBid);
   incrementBtn.textContent = `+ ₹${step.toLocaleString()}`;
   return step;
 }
@@ -71,19 +74,21 @@ function updateIncrementButton() {
 ========================= */
 incrementBtn.onclick = () => {
   const step = updateIncrementButton();
-  currentBid += step;
+  let nextBid = currentBid + step;
 
-  // Clamp if team selected
+  // Apply max-bid safety if team selected
   if (selectedTeamId) {
     const team = teamsCache[selectedTeamId];
-    const remaining = TOTAL_PLAYERS - (team.playersCount || 0);
-    const maxBid = team.budget - (remaining - 1) * BASE_PRICE;
+    const remainingPlayers = TOTAL_PLAYERS - (team.playersCount || 0);
+    const maxBid =
+      team.budget - (remainingPlayers - 1) * BASE_PRICE;
 
-    if (currentBid > maxBid) {
-      currentBid = maxBid;
+    if (nextBid > maxBid) {
+      nextBid = maxBid;
     }
   }
 
+  currentBid = nextBid;
   bidDisplay.textContent = `₹${currentBid.toLocaleString()}`;
   updateIncrementButton();
 };
@@ -108,7 +113,7 @@ async function loadCurrentPlayer() {
   battingEl.textContent = "★★★★☆";
   bowlingEl.textContent = "★★★★☆";
 
-  // Photo (manual)
+  // Photo (manual first-name system)
   const photoEl = document.querySelector(".player-photo");
   const firstName = currentPlayerData.name.split(" ")[0].toLowerCase();
   const path = `assets/players/${firstName}.jpg`;
@@ -149,6 +154,7 @@ async function loadTeams() {
     const team = docSnap.data();
     teamsCache[docSnap.id] = team;
 
+    // Team button
     const btn = document.createElement("button");
     btn.className = "team-btn";
     btn.textContent = team.name;
@@ -190,7 +196,7 @@ function selectTeam(button) {
   selectedTeamId = button.dataset.teamId;
   soldBtn.disabled = false;
 
-  // Clamp bid on selection
+  // Clamp bid immediately
   incrementBtn.onclick();
 }
 
@@ -238,10 +244,8 @@ soldBtn.onclick = async () => {
   soldInfo.classList.remove("hidden");
   soldToEl.textContent = team.name;
   soldPriceEl.textContent = bidAmount.toLocaleString();
-
   soldBadge.classList.add("sold-animate");
 
-  // Delay before next player
   setTimeout(async () => {
     resetUI();
     await moveToNextPlayer();
@@ -295,9 +299,9 @@ async function moveToNextPlayer() {
 function resetUI() {
   selectedTeamId = null;
   soldBtn.disabled = true;
-  incrementBtn.disabled = false;
   currentBid = BASE_PRICE;
   bidDisplay.textContent = `₹${BASE_PRICE.toLocaleString()}`;
+  updateIncrementButton();
 }
 
 /* =========================
