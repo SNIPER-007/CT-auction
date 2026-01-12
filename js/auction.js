@@ -16,6 +16,7 @@ import { db } from "./firebase.js";
 ========================= */
 const TOTAL_PLAYERS = 9;
 const BASE_PRICE = 10000;
+const BID_INCREMENT = 1000;
 
 /* =========================
    DOM ELEMENTS
@@ -41,9 +42,12 @@ const bowlingEl = document.querySelector(".player-right .stat:nth-child(3) span"
 // Teams & bidding
 const teamsGrid = document.getElementById("teamsGrid");
 const teamsTableBody = document.getElementById("teamsTableBody");
-const bidInput = document.getElementById("bidInput");
 const soldBtn = document.querySelector(".sold-btn");
 const unsoldBtn = document.querySelector(".unsold-btn");
+
+// Increment UI
+const bidDisplay = document.getElementById("bidDisplay");
+const incrementBtn = document.getElementById("incrementBtn");
 
 /* =========================
    STATE
@@ -52,26 +56,7 @@ let selectedTeamId = null;
 let teamsCache = {};
 let currentPlayerId = null;
 let currentPlayerData = null;
-
-/* =========================
-   BID INPUT HANDLER
-========================= */
-bidInput.addEventListener("input", () => {
-  bidInput.value = bidInput.value.replace(/[^0-9]/g, "");
-
-  if (!selectedTeamId) return;
-
-  const team = teamsCache[selectedTeamId];
-  if (!team) return;
-
-  const value = Number(bidInput.value);
-  const remaining = TOTAL_PLAYERS - (team.playersCount || 0);
-  const maxBid = team.budget - (remaining - 1) * BASE_PRICE;
-
-  if (value > maxBid) {
-    bidInput.value = String(maxBid);
-  }
-});
+let currentBid = BASE_PRICE;
 
 /* =========================
    LOAD CURRENT PLAYER
@@ -89,24 +74,19 @@ async function loadCurrentPlayer() {
 
   // Text
   playerNameEl.textContent = currentPlayerData.name;
-  basePriceEl.textContent = `Base Price: ₹${currentPlayerData.basePrice.toLocaleString()}`;
+  basePriceEl.textContent = `Base Price: ₹${BASE_PRICE.toLocaleString()}`;
   roleEl.textContent = currentPlayerData.role;
   battingEl.textContent = "★★★★☆";
   bowlingEl.textContent = "★★★★☆";
 
-  // ✅ MANUAL PHOTO SYSTEM
+  // PHOTO (manual by first name)
   const playerPhotoEl = document.querySelector(".player-photo");
-
-  const firstName = currentPlayerData.name
-    .split(" ")[0]
-    .toLowerCase();
-
+  const firstName = currentPlayerData.name.split(" ")[0].toLowerCase();
   const photoPath = `assets/players/${firstName}.jpg`;
 
   playerPhotoEl.style.backgroundImage = `url('${photoPath}')`;
   playerPhotoEl.textContent = "";
 
-  // Fallback if image not found
   const testImg = new Image();
   testImg.onerror = () => {
     playerPhotoEl.style.backgroundImage = `url('assets/players/default.jpg')`;
@@ -124,7 +104,13 @@ async function loadCurrentPlayer() {
     soldInfo.classList.add("hidden");
   }
 
+  // reset bid
+  currentBid = BASE_PRICE;
+  bidDisplay.textContent = `₹${currentBid.toLocaleString()}`;
+  incrementBtn.disabled = true;
+  soldBtn.disabled = true;
   unsoldBtn.disabled = false;
+
   await loadTeams();
 }
 
@@ -198,11 +184,28 @@ function selectTeam(button) {
   button.classList.add("selected");
   selectedTeamId = button.dataset.teamId;
 
-  bidInput.disabled = false;
+  currentBid = BASE_PRICE;
+  bidDisplay.textContent = `₹${currentBid.toLocaleString()}`;
+
+  incrementBtn.disabled = false;
   soldBtn.disabled = false;
-  bidInput.value = String(BASE_PRICE);
-  bidInput.focus();
 }
+
+/* =========================
+   INCREMENT BID
+========================= */
+incrementBtn.onclick = () => {
+  if (!selectedTeamId) return;
+
+  const team = teamsCache[selectedTeamId];
+  const remaining = TOTAL_PLAYERS - (team.playersCount || 0);
+  const maxBid = team.budget - (remaining - 1) * BASE_PRICE;
+
+  if (currentBid + BID_INCREMENT > maxBid) return;
+
+  currentBid += BID_INCREMENT;
+  bidDisplay.textContent = `₹${currentBid.toLocaleString()}`;
+};
 
 /* =========================
    NEXT PLAYER
@@ -243,9 +246,9 @@ soldBtn.onclick = async () => {
 
   const team = teamsCache[selectedTeamId];
   const gender = currentPlayerData.gender;
-  const bidAmount = Number(bidInput.value);
+  const bidAmount = currentBid;
 
-  if (!bidAmount || bidAmount < BASE_PRICE) return;
+  if (bidAmount < BASE_PRICE) return;
   if (gender === "girl" && (team.girlsCount || 0) >= 2) return;
   if (gender === "boy" && (team.boysCount || 0) >= 7) return;
 
@@ -301,10 +304,12 @@ unsoldBtn.onclick = async () => {
 ========================= */
 function resetUI() {
   selectedTeamId = null;
-  bidInput.value = "";
-  bidInput.disabled = true;
+  currentBid = BASE_PRICE;
+  bidDisplay.textContent = `₹${BASE_PRICE.toLocaleString()}`;
+  incrementBtn.disabled = true;
   soldBtn.disabled = true;
   unsoldBtn.disabled = true;
+
   document.querySelectorAll(".team-btn").forEach(b =>
     b.classList.remove("selected")
   );
