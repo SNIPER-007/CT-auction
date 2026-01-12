@@ -5,32 +5,35 @@ import {
   orderBy
 } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore.js";
 
-const playersTableBody = document.getElementById("playersTableBody");
+import { db } from "./firebase.js";
+
+const tableBody = document.getElementById("playersTableBody");
 
 async function loadPlayers() {
-  const q = query(collection(db, "players"), orderBy("__name__"));
-  const snapshot = await getDocs(q);
+  try {
+    const q = query(collection(db, "players"), orderBy("__name__"));
+    const snapshot = await getDocs(q);
 
-  playersTableBody.innerHTML = "";
+    tableBody.innerHTML = "";
+    let i = 1;
 
-  snapshot.forEach((docSnap, index) => {
-    const p = docSnap.data();
+    snapshot.forEach(docSnap => {
+      const p = docSnap.data();
 
-    const row = document.createElement("tr");
-    row.innerHTML = `
-      <td>${index + 1}</td>
-      <td>${p.name}</td>
-      <td>${p.sold ? "SOLD" : "UNSOLD"}</td>
-      <td>${p.sold ? p.soldTo : "—"}</td>
-      <td>${p.sold ? "₹" + p.soldPrice.toLocaleString() : "—"}</td>
-    `;
+      const row = document.createElement("tr");
+      row.innerHTML = `
+        <td>${i++}</td>
+        <td>${p.name}</td>
+        <td>${p.sold ? "SOLD" : "UNSOLD"}</td>
+        <td>${p.sold ? p.soldTo : "—"}</td>
+        <td>${p.sold ? "₹" + p.soldPrice.toLocaleString() : "—"}</td>
+      `;
 
-    playersTableBody.appendChild(row);
-  });
+      tableBody.appendChild(row);
+    });
+  } catch (err) {
+    console.error("Failed to load players:", err);
+  }
 }
 
 loadPlayers();
-
-// Auto refresh every 5 seconds
-setInterval(loadPlayers, 5000);
-
