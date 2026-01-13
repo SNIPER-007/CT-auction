@@ -38,6 +38,8 @@ const playerPhotoEl = document.querySelector(".player-photo");
 
 const soldBadge = document.getElementById("soldBadge");
 const soldInfo = document.getElementById("soldInfo");
+const soldToEl = document.getElementById("soldTo");
+const soldPriceEl = document.getElementById("soldPrice");
 
 const soldSound = new Audio("assets/sounds/sold.mp3");
 soldSound.volume = 0.9;
@@ -52,7 +54,7 @@ let currentPlayerData = null;
 let currentBid = BASE_PRICE;
 
 /* =========================
-   BID LOGIC
+   BID INCREMENT
 ========================= */
 function getIncrementStep() {
   if (currentBid < 50000) return 2000;
@@ -65,7 +67,8 @@ function updateBidUI() {
   incrementBtn.textContent = `+ ₹${getIncrementStep().toLocaleString()}`;
 }
 
-incrementBtn.addEventListener("click", () => {
+incrementBtn.disabled = false;
+incrementBtn.onclick = () => {
   currentBid += getIncrementStep();
 
   if (selectedTeamId) {
@@ -74,59 +77,82 @@ incrementBtn.addEventListener("click", () => {
     const maxBid = team.budget - (remaining - 1) * BASE_PRICE;
     if (currentBid > maxBid) currentBid = maxBid;
   }
+
   updateBidUI();
-});
+};
 
 /* =========================
-   STAR RENDER
+   STARS
 ========================= */
-function renderStars(val, cls) {
+function renderStars(count, cls) {
   let html = "";
   for (let i = 1; i <= 5; i++) {
-    html += `<span class="star ${i <= val ? cls : "muted"}">★</span>`;
+    html += `<span class="star ${i <= count ? cls : "muted"}">★</span>`;
   }
   return html;
 }
 
 /* =========================
-   LOAD PLAYER
+   LOAD CURRENT PLAYER
 ========================= */
 async function loadCurrentPlayer() {
   const auctionRef = doc(db, "auction", "current");
   const auctionSnap = await getDoc(auctionRef);
+
   if (!auctionSnap.exists()) return;
 
-  currentPlayerId = auctionSnap.data().currentPlayerId;
-  if (!currentPlayerId) return;
+  let { currentPlayerId, phase } = auctionSnap.data();
 
-  const playerSnap = await getDoc(doc(db, "players", currentPlayerId));
-  if (!playerSnap.exists()) return;
+  const playersSnap = await getDocs(
+    query(collection(db, "players"), orderBy("__name__"))
+  );
 
-  currentPlayerData = playerSnap.data();
+  const players = playersSnap.docs.map(d => ({
+    id: d.id,
+    ...d.data()
+  }));
 
+  // 🔥 SEED FIRST PLAYER IF NEEDED
+  if (!currentPlayerId) {
+    await moveToNextPlayer();
+    return loadCurrentPlayer();
+  }
+
+  const player = players.find(p => p.id === currentPlayerId);
+  if (!player) {
+    await moveToNextPlayer();
+    return loadCurrentPlayer();
+  }
+
+  currentPlayerData = player;
+  currentBid = player.basePrice || BASE_PRICE;
   selectedTeamId = null;
-  currentBid = currentPlayerData.basePrice || BASE_PRICE;
 
-  playerNameEl.textContent = currentPlayerData.name;
+  // UI
+  playerNameEl.textContent = player.name;
   basePriceEl.textContent = `Base Price: ₹${currentBid}`;
-  roleEl.textContent = currentPlayerData.role || "-";
+  roleEl.textContent = player.role || "-";
 
-  const stats = currentPlayerData.stats || {};
-  battingEl.innerHTML = renderStars(stats.batting || 0, "bat");
-  bowlingEl.innerHTML = renderStars(stats.bowling || 0, "bowl");
+  battingEl.innerHTML = renderStars(player.stats?.batting || 0, "bat");
+  bowlingEl.innerHTML = renderStars(player.stats?.bowling || 0, "bowl");
 
-  const first = currentPlayerData.name.split(" ")[0].toLowerCase();
-  const imgPath = `assets/images/${first}.jpeg`;
-
+  // PHOTO
+  const firstName = player.name.split(" ")[0].toLowerCase();
+  const imgPath = `assets/images/${firstName}.jpeg`;
   const img = new Image();
-  img.onload = () => playerPhotoEl.style.backgroundImage = `url('${imgPath}')`;
-  img.onerror = () =>
-    (playerPhotoEl.style.backgroundImage =
-      "url('assets/images/default.jpeg')");
+  img.onload = () => {
+    playerPhotoEl.style.backgroundImage = `url('${imgPath}')`;
+    playerPhotoEl.textContent = "";
+  };
+  img.onerror = () => {
+    playerPhotoEl.style.backgroundImage = `url('assets/images/default.jpeg')`;
+    playerPhotoEl.textContent = "NO PHOTO";
+  };
   img.src = imgPath;
 
   soldBtn.disabled = true;
   unsoldBtn.disabled = false;
+
   updateBidUI();
   await loadTeams();
 }
@@ -140,20 +166,20 @@ async function loadTeams() {
   teamsTableBody.innerHTML = "";
   teamsCache = {};
 
-  snap.forEach(d => {
-    const team = d.data();
-    teamsCache[d.id] = team;
+  snap.forEach(docSnap => {
+    const team = docSnap.data();
+    teamsCache[docSnap.id] = team;
 
     const btn = document.createElement("button");
     btn.className = "team-btn";
     btn.textContent = team.name;
 
     btn.onclick = () => {
-      document
-        .querySelectorAll(".team-btn")
-        .forEach(b => b.classList.remove("selected"));
+      document.querySelectorAll(".team-btn").forEach(b =>
+        b.classList.remove("selected")
+      );
       btn.classList.add("selected");
-      selectedTeamId = d.id;
+      selectedTeamId = docSnap.id;
       soldBtn.disabled = false;
     };
 
@@ -177,7 +203,7 @@ soldBtn.onclick = async () => {
 
   await runTransaction(db, async tx => {
     const teamRef = doc(db, "teams", selectedTeamId);
-    const playerRef = doc(db, "players", currentPlayerId);
+    const playerRef = doc(db, "players", currentPlayerData.id);
 
     const team = (await tx.get(teamRef)).data();
     const player = (await tx.get(playerRef)).data();
@@ -186,8 +212,7 @@ soldBtn.onclick = async () => {
     tx.update(teamRef, {
       budget: team.budget - currentBid,
       playersCount: (team.playersCount || 0) + 1,
-      [`${player.gender}sCount`]:
-        (team[`${player.gender}sCount`] || 0) + 1,
+      [`${player.gender}sCount`]: (team[`${player.gender}sCount`] || 0) + 1,
       players: [...team.players, { name: player.name, price: currentBid }]
     });
 
@@ -209,7 +234,7 @@ soldBtn.onclick = async () => {
 };
 
 /* =========================
-   UNSOLD (FIXED)
+   UNSOLD
 ========================= */
 unsoldBtn.onclick = async () => {
   await moveToNextPlayer();
@@ -217,39 +242,43 @@ unsoldBtn.onclick = async () => {
 };
 
 /* =========================
-   NEXT PLAYER (CORRECT)
+   NEXT PLAYER (FINAL PHASE LOGIC)
 ========================= */
 async function moveToNextPlayer() {
   const auctionRef = doc(db, "auction", "current");
   const auctionSnap = await getDoc(auctionRef);
-  let phase = auctionSnap.data().phase || "girls";
+
+  let phase = auctionSnap.data()?.phase || "girls";
 
   const snap = await getDocs(
     query(collection(db, "players"), orderBy("__name__"))
   );
-  const players = snap.docs.map(d => ({ id: d.id, ...d.data() }));
 
-  const girlsLeft = players.some(
-    p => p.gender === "girl" && p.sold !== true
+  const players = snap.docs.map(d => ({
+    id: d.id,
+    ...d.data()
+  }));
+
+  const unsoldGirls = players.filter(
+    p => p.gender === "girl" && !p.sold
   );
 
-  if (phase === "girls" && !girlsLeft) {
+  if (phase === "girls" && unsoldGirls.length === 0) {
     phase = "boys";
     await updateDoc(auctionRef, { phase: "boys" });
   }
 
   const eligible = players.filter(
-    p => p.gender === phase && p.sold !== true
+    p => p.gender === phase && !p.sold
   );
 
-  if (eligible.length === 0) return;
-
-  const idx = eligible.findIndex(p => p.id === currentPlayerId);
-  const next =
-    eligible[idx + 1] || eligible[0];
+  if (eligible.length === 0) {
+    alert("🎉 AUCTION COMPLETED!");
+    return;
+  }
 
   await updateDoc(auctionRef, {
-    currentPlayerId: next.id
+    currentPlayerId: eligible[0].id
   });
 }
 
