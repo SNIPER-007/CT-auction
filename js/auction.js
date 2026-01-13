@@ -21,7 +21,6 @@ const SOLD_DELAY = 5000;
 /* =========================
    DOM ELEMENTS
 ========================= */
-const teamsMenu = document.getElementById("teamsMenu");
 const teamsGrid = document.getElementById("teamsGrid");
 const teamsTableBody = document.getElementById("teamsTableBody");
 
@@ -53,9 +52,21 @@ let teamsCache = {};
 let currentPlayerId = null;
 let currentPlayerData = null;
 let currentBid = BASE_PRICE;
+let auctionPhase = "girl"; // girl → boy
 
 /* =========================
-   INCREMENT SLAB LOGIC
+   STAR RENDER (COLOR GRADED)
+========================= */
+function renderStars(rating) {
+  let html = "";
+  for (let i = 1; i <= 5; i++) {
+    html += `<span class="star ${i <= rating ? "filled" : ""}">★</span>`;
+  }
+  return html;
+}
+
+/* =========================
+   BID INCREMENT SLABS
 ========================= */
 function getIncrementStep(bid) {
   if (bid < 50000) return 2000;
@@ -73,19 +84,14 @@ function updateIncrementButton() {
    INCREMENT BID (ANYTIME)
 ========================= */
 incrementBtn.onclick = () => {
-  const step = updateIncrementButton();
+  let step = updateIncrementButton();
   let nextBid = currentBid + step;
 
-  // Apply max-bid safety if team selected
   if (selectedTeamId) {
     const team = teamsCache[selectedTeamId];
-    const remainingPlayers = TOTAL_PLAYERS - (team.playersCount || 0);
-    const maxBid =
-      team.budget - (remainingPlayers - 1) * BASE_PRICE;
-
-    if (nextBid > maxBid) {
-      nextBid = maxBid;
-    }
+    const remaining = TOTAL_PLAYERS - (team.playersCount || 0);
+    const maxBid = team.budget - (remaining - 1) * BASE_PRICE;
+    if (nextBid > maxBid) nextBid = maxBid;
   }
 
   currentBid = nextBid;
@@ -106,33 +112,31 @@ async function loadCurrentPlayer() {
 
   currentPlayerData = playerSnap.data();
 
-  // Text
   playerNameEl.textContent = currentPlayerData.name;
   basePriceEl.textContent = `Base Price: ₹${BASE_PRICE.toLocaleString()}`;
   roleEl.textContent = currentPlayerData.role;
-  battingEl.textContent = "★★★★☆";
-  bowlingEl.textContent = "★★★★☆";
 
-  // Photo (manual first-name system)
+  battingEl.innerHTML = renderStars(currentPlayerData.batting || 0);
+  bowlingEl.innerHTML = renderStars(currentPlayerData.bowling || 0);
+
+  // Photo (manual by first name)
   const photoEl = document.querySelector(".player-photo");
   const firstName = currentPlayerData.name.split(" ")[0].toLowerCase();
-  const path = `assets/players/${firstName}.jpg`;
+  const imgPath = `assets/players/${firstName}.jpg`;
 
-  photoEl.style.backgroundImage = `url('${path}')`;
+  photoEl.style.backgroundImage = `url('${imgPath}')`;
   const img = new Image();
   img.onerror = () => {
     photoEl.style.backgroundImage = `url('assets/players/default.jpg')`;
   };
-  img.src = path;
+  img.src = imgPath;
 
-  // Reset bid UI
   currentBid = BASE_PRICE;
   bidDisplay.textContent = `₹${currentBid.toLocaleString()}`;
   updateIncrementButton();
 
   soldBtn.disabled = true;
   unsoldBtn.disabled = false;
-  incrementBtn.disabled = false;
 
   soldBadge.classList.add("hidden");
   soldInfo.classList.add("hidden");
@@ -145,7 +149,6 @@ async function loadCurrentPlayer() {
 ========================= */
 async function loadTeams() {
   const snap = await getDocs(collection(db, "teams"));
-  teamsMenu.innerHTML = "";
   teamsGrid.innerHTML = "";
   teamsTableBody.innerHTML = "";
   teamsCache = {};
@@ -154,7 +157,6 @@ async function loadTeams() {
     const team = docSnap.data();
     teamsCache[docSnap.id] = team;
 
-    // Team button
     const btn = document.createElement("button");
     btn.className = "team-btn";
     btn.textContent = team.name;
@@ -191,13 +193,9 @@ function selectTeam(button) {
   document.querySelectorAll(".team-btn").forEach(b =>
     b.classList.remove("selected")
   );
-
   button.classList.add("selected");
   selectedTeamId = button.dataset.teamId;
   soldBtn.disabled = false;
-
-  // Clamp bid immediately
-  incrementBtn.onclick();
 }
 
 /* =========================
@@ -238,13 +236,11 @@ soldBtn.onclick = async () => {
     });
   });
 
-  // SOLD FX
   soldSound.play();
   soldBadge.classList.remove("hidden");
   soldInfo.classList.remove("hidden");
   soldToEl.textContent = team.name;
   soldPriceEl.textContent = bidAmount.toLocaleString();
-  soldBadge.classList.add("sold-animate");
 
   setTimeout(async () => {
     resetUI();
@@ -263,34 +259,28 @@ unsoldBtn.onclick = async () => {
 };
 
 /* =========================
-   NEXT PLAYER
+   NEXT PLAYER (GIRLS FIRST)
 ========================= */
 async function moveToNextPlayer() {
-  const q = query(collection(db, "players"), orderBy("__name__"));
-  const snap = await getDocs(q);
-
+  const snap = await getDocs(query(collection(db, "players"), orderBy("__name__")));
   const players = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-  const idx = players.findIndex(p => p.id === currentPlayerId);
 
-  for (let i = idx + 1; i < players.length; i++) {
-    if (!players[i].sold) {
-      await updateDoc(doc(db, "auction", "current"), {
-        currentPlayerId: players[i].id
-      });
-      return;
-    }
+  // Check if girls still remain
+  const girlsLeft = players.some(p => p.gender === "girl" && !p.sold);
+  auctionPhase = girlsLeft ? "girl" : "boy";
+
+  const filtered = players.filter(
+    p => p.gender === auctionPhase && !p.sold
+  );
+
+  if (!filtered.length) {
+    alert("🎉 Auction completed!");
+    return;
   }
 
-  for (let i = 0; i <= idx; i++) {
-    if (!players[i].sold) {
-      await updateDoc(doc(db, "auction", "current"), {
-        currentPlayerId: players[i].id
-      });
-      return;
-    }
-  }
-
-  alert("🎉 Auction completed!");
+  await updateDoc(doc(db, "auction", "current"), {
+    currentPlayerId: filtered[0].id
+  });
 }
 
 /* =========================
@@ -309,8 +299,3 @@ function resetUI() {
 ========================= */
 loadCurrentPlayer();
 
-document.querySelector(".fullscreen-btn").onclick = () => {
-  document.fullscreenElement
-    ? document.exitFullscreen()
-    : document.documentElement.requestFullscreen();
-};
