@@ -52,7 +52,7 @@ let currentPlayerData = null;
 let currentBid = BASE_PRICE;
 
 /* =========================
-   BID INCREMENT LOGIC
+   BID LOGIC
 ========================= */
 function getIncrementStep() {
   if (currentBid < 50000) return 2000;
@@ -61,25 +61,18 @@ function getIncrementStep() {
 }
 
 function updateBidUI() {
-  if (bidDisplay) {
-    bidDisplay.textContent = `₹${currentBid.toLocaleString()}`;
-  }
-  if (incrementBtn) {
-    incrementBtn.textContent = `+ ₹${getIncrementStep().toLocaleString()}`;
-  }
+  bidDisplay.textContent = `₹${currentBid.toLocaleString()}`;
+  incrementBtn.textContent = `+ ₹${getIncrementStep().toLocaleString()}`;
 }
 
-incrementBtn?.addEventListener("click", () => {
+incrementBtn.addEventListener("click", () => {
   currentBid += getIncrementStep();
 
-  // Cap only if team selected
   if (selectedTeamId) {
     const team = teamsCache[selectedTeamId];
-    if (team) {
-      const remaining = TOTAL_PLAYERS - (team.playersCount || 0);
-      const maxBid = team.budget - (remaining - 1) * BASE_PRICE;
-      if (currentBid > maxBid) currentBid = maxBid;
-    }
+    const remaining = TOTAL_PLAYERS - (team.playersCount || 0);
+    const maxBid = team.budget - (remaining - 1) * BASE_PRICE;
+    if (currentBid > maxBid) currentBid = maxBid;
   }
   updateBidUI();
 });
@@ -87,25 +80,23 @@ incrementBtn?.addEventListener("click", () => {
 /* =========================
    STAR RENDER
 ========================= */
-function renderStars(value, cls) {
+function renderStars(val, cls) {
   let html = "";
   for (let i = 1; i <= 5; i++) {
-    html += `<span class="star ${i <= value ? cls : "muted"}">★</span>`;
+    html += `<span class="star ${i <= val ? cls : "muted"}">★</span>`;
   }
   return html;
 }
 
 /* =========================
-   LOAD CURRENT PLAYER
+   LOAD PLAYER
 ========================= */
 async function loadCurrentPlayer() {
   const auctionRef = doc(db, "auction", "current");
   const auctionSnap = await getDoc(auctionRef);
   if (!auctionSnap.exists()) return;
 
-  const auctionData = auctionSnap.data();
-  currentPlayerId = auctionData.currentPlayerId;
-
+  currentPlayerId = auctionSnap.data().currentPlayerId;
   if (!currentPlayerId) return;
 
   const playerSnap = await getDoc(doc(db, "players", currentPlayerId));
@@ -113,11 +104,10 @@ async function loadCurrentPlayer() {
 
   currentPlayerData = playerSnap.data();
 
-  // Reset UI state
   selectedTeamId = null;
   currentBid = currentPlayerData.basePrice || BASE_PRICE;
 
-  playerNameEl.textContent = currentPlayerData.name || "-";
+  playerNameEl.textContent = currentPlayerData.name;
   basePriceEl.textContent = `Base Price: ₹${currentBid}`;
   roleEl.textContent = currentPlayerData.role || "-";
 
@@ -125,24 +115,18 @@ async function loadCurrentPlayer() {
   battingEl.innerHTML = renderStars(stats.batting || 0, "bat");
   bowlingEl.innerHTML = renderStars(stats.bowling || 0, "bowl");
 
-  // Photo
-  const firstName = currentPlayerData.name.split(" ")[0].toLowerCase();
-  const imgPath = `assets/images/${firstName}.jpeg`;
+  const first = currentPlayerData.name.split(" ")[0].toLowerCase();
+  const imgPath = `assets/images/${first}.jpeg`;
 
   const img = new Image();
-  img.onload = () => {
-    playerPhotoEl.style.backgroundImage = `url('${imgPath}')`;
-    playerPhotoEl.textContent = "";
-  };
-  img.onerror = () => {
-    playerPhotoEl.style.backgroundImage = `url('assets/images/default.jpeg')`;
-    playerPhotoEl.textContent = "NO PHOTO";
-  };
+  img.onload = () => playerPhotoEl.style.backgroundImage = `url('${imgPath}')`;
+  img.onerror = () =>
+    (playerPhotoEl.style.backgroundImage =
+      "url('assets/images/default.jpeg')");
   img.src = imgPath;
 
   soldBtn.disabled = true;
   unsoldBtn.disabled = false;
-
   updateBidUI();
   await loadTeams();
 }
@@ -156,20 +140,20 @@ async function loadTeams() {
   teamsTableBody.innerHTML = "";
   teamsCache = {};
 
-  snap.forEach(docSnap => {
-    const team = docSnap.data();
-    teamsCache[docSnap.id] = team;
+  snap.forEach(d => {
+    const team = d.data();
+    teamsCache[d.id] = team;
 
     const btn = document.createElement("button");
     btn.className = "team-btn";
     btn.textContent = team.name;
 
     btn.onclick = () => {
-      document.querySelectorAll(".team-btn").forEach(b =>
-        b.classList.remove("selected")
-      );
+      document
+        .querySelectorAll(".team-btn")
+        .forEach(b => b.classList.remove("selected"));
       btn.classList.add("selected");
-      selectedTeamId = docSnap.id;
+      selectedTeamId = d.id;
       soldBtn.disabled = false;
     };
 
@@ -202,7 +186,8 @@ soldBtn.onclick = async () => {
     tx.update(teamRef, {
       budget: team.budget - currentBid,
       playersCount: (team.playersCount || 0) + 1,
-      [`${player.gender}sCount`]: (team[`${player.gender}sCount`] || 0) + 1,
+      [`${player.gender}sCount`]:
+        (team[`${player.gender}sCount`] || 0) + 1,
       players: [...team.players, { name: player.name, price: currentBid }]
     });
 
@@ -224,7 +209,7 @@ soldBtn.onclick = async () => {
 };
 
 /* =========================
-   UNSOLD
+   UNSOLD (FIXED)
 ========================= */
 unsoldBtn.onclick = async () => {
   await moveToNextPlayer();
@@ -232,7 +217,7 @@ unsoldBtn.onclick = async () => {
 };
 
 /* =========================
-   NEXT PLAYER (PHASE HANDLING)
+   NEXT PLAYER (CORRECT)
 ========================= */
 async function moveToNextPlayer() {
   const auctionRef = doc(db, "auction", "current");
@@ -244,12 +229,11 @@ async function moveToNextPlayer() {
   );
   const players = snap.docs.map(d => ({ id: d.id, ...d.data() }));
 
-  // Switch phase ONLY when all girls are sold
-  const unsoldGirls = players.filter(
+  const girlsLeft = players.some(
     p => p.gender === "girl" && p.sold !== true
   );
 
-  if (phase === "girls" && unsoldGirls.length === 0) {
+  if (phase === "girls" && !girlsLeft) {
     phase = "boys";
     await updateDoc(auctionRef, { phase: "boys" });
   }
@@ -260,8 +244,12 @@ async function moveToNextPlayer() {
 
   if (eligible.length === 0) return;
 
+  const idx = eligible.findIndex(p => p.id === currentPlayerId);
+  const next =
+    eligible[idx + 1] || eligible[0];
+
   await updateDoc(auctionRef, {
-    currentPlayerId: eligible[0].id
+    currentPlayerId: next.id
   });
 }
 
