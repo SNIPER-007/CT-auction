@@ -20,10 +20,14 @@ const BASE_PRICE = 10000;
 /* =========================
    DOM ELEMENTS
 ========================= */
-const soldBadge = document.getElementById("soldBadge");
-const soldInfo = document.getElementById("soldInfo");
-const soldToEl = document.getElementById("soldTo");
-const soldPriceEl = document.getElementById("soldPrice");
+const teamsGrid = document.getElementById("teamsGrid");
+const teamsTableBody = document.getElementById("teamsTableBody");
+
+const bidAmountEl = document.getElementById("currentBid");
+const incrementBtn = document.getElementById("incrementBtn");
+
+const soldBtn = document.querySelector(".sold-btn");
+const unsoldBtn = document.querySelector(".unsold-btn");
 
 const playerNameEl = document.querySelector(".player-name");
 const basePriceEl = document.querySelector(".base-price");
@@ -32,14 +36,13 @@ const battingEl = document.querySelector(".player-right .stat:nth-child(2) span"
 const bowlingEl = document.querySelector(".player-right .stat:nth-child(3) span");
 const playerPhotoEl = document.querySelector(".player-photo");
 
-const teamsGrid = document.getElementById("teamsGrid");
-const teamsTableBody = document.getElementById("teamsTableBody");
+const soldBadge = document.getElementById("soldBadge");
+const soldInfo = document.getElementById("soldInfo");
+const soldToEl = document.getElementById("soldTo");
+const soldPriceEl = document.getElementById("soldPrice");
 
-const bidDisplay = document.getElementById("bidDisplay"); // span/div showing bid
-const incrementBtn = document.getElementById("incrementBtn");
-
-const soldBtn = document.querySelector(".sold-btn");
-const unsoldBtn = document.querySelector(".unsold-btn");
+const soldSound = new Audio("assets/sounds/sold.mp3");
+soldSound.volume = 0.8;
 
 /* =========================
    STATE
@@ -51,17 +54,32 @@ let currentPlayerData = null;
 let currentBid = BASE_PRICE;
 
 /* =========================
-   STAR RENDERER
+   INCREMENT LOGIC
 ========================= */
-function renderStars(value) {
-  let stars = "";
-  for (let i = 1; i <= 5; i++) {
-    stars += i <= value ? "★" : "☆";
+function getIncrementAmount() {
+  if (currentBid < 50000) return 2000;
+  if (currentBid < 100000) return 5000;
+  return 10000;
+}
+
+incrementBtn.onclick = () => {
+  const inc = getIncrementAmount();
+  currentBid += inc;
+
+  // Max bid safety (if team selected)
+  if (selectedTeamId) {
+    const team = teamsCache[selectedTeamId];
+    const remaining = TOTAL_PLAYERS - (team.playersCount || 0);
+    const maxBid = team.budget - (remaining - 1) * BASE_PRICE;
+
+    if (currentBid > maxBid) {
+      currentBid = maxBid;
+    }
   }
 
-  let color = value <= 2 ? "#ff4d4d" : value === 3 ? "#ffc107" : "#4caf50";
-  return `<span style="color:${color}">${stars}</span>`;
-}
+  bidAmountEl.textContent = `₹${currentBid.toLocaleString()}`;
+  incrementBtn.textContent = `+ ₹${getIncrementAmount().toLocaleString()}`;
+};
 
 /* =========================
    LOAD CURRENT PLAYER
@@ -71,35 +89,39 @@ async function loadCurrentPlayer() {
   if (!auctionSnap.exists()) return;
 
   currentPlayerId = auctionSnap.data().currentPlayerId;
-
   const playerSnap = await getDoc(doc(db, "players", currentPlayerId));
   if (!playerSnap.exists()) return;
 
   currentPlayerData = playerSnap.data();
+
+  // Reset bid
+  currentBid = currentPlayerData.basePrice || BASE_PRICE;
+  bidAmountEl.textContent = `₹${currentBid.toLocaleString()}`;
+  incrementBtn.textContent = `+ ₹${getIncrementAmount().toLocaleString()}`;
 
   // Text
   playerNameEl.textContent = currentPlayerData.name;
   basePriceEl.textContent = `Base Price: ₹${currentPlayerData.basePrice}`;
   roleEl.textContent = currentPlayerData.role;
 
-  // ⭐ Dynamic stats
-  battingEl.innerHTML = renderStars(currentPlayerData.stats?.batting || 0);
-  bowlingEl.innerHTML = renderStars(currentPlayerData.stats?.bowling || 0);
+  // ⭐ Dynamic Stars
+  battingEl.innerHTML = renderStars(currentPlayerData.stats?.batting || 0, "bat");
+  bowlingEl.innerHTML = renderStars(currentPlayerData.stats?.bowling || 0, "bowl");
 
-  // 📸 Photo (manual filename system)
+  // 🖼️ Player Image (FINAL FIX)
   const firstName = currentPlayerData.name.split(" ")[0].toLowerCase();
-  const imgPath = `assets/players/${firstName}.jpg`;
-
-  playerPhotoEl.style.backgroundImage = `url('${imgPath}')`;
-  playerPhotoEl.textContent = "";
+  const imgPath = `assets/images/${firstName}.jpeg`;
 
   const img = new Image();
+  img.onload = () => {
+    playerPhotoEl.style.backgroundImage = `url('${imgPath}')`;
+  };
   img.onerror = () => {
-    playerPhotoEl.style.backgroundImage = `url('assets/players/default.jpg')`;
+    playerPhotoEl.style.backgroundImage = `url('assets/images/default.jpeg')`;
   };
   img.src = imgPath;
 
-  // SOLD badge
+  // SOLD UI
   if (currentPlayerData.sold) {
     soldBadge.classList.remove("hidden");
     soldInfo.classList.remove("hidden");
@@ -110,12 +132,9 @@ async function loadCurrentPlayer() {
     soldInfo.classList.add("hidden");
   }
 
-  // Reset bid
-  currentBid = BASE_PRICE;
-  bidDisplay.textContent = `₹${currentBid}`;
-
-  soldBtn.disabled = true;     // 🔒 until team selected
-  unsoldBtn.disabled = false; // ✅ always allowed
+  unsoldBtn.disabled = false;
+  soldBtn.disabled = true;
+  selectedTeamId = null;
 
   await loadTeams();
 }
@@ -124,79 +143,55 @@ async function loadCurrentPlayer() {
    LOAD TEAMS
 ========================= */
 async function loadTeams() {
-  const snapshot = await getDocs(collection(db, "teams"));
+  const snap = await getDocs(collection(db, "teams"));
   teamsGrid.innerHTML = "";
   teamsTableBody.innerHTML = "";
   teamsCache = {};
 
-  snapshot.forEach(docSnap => {
+  snap.forEach(docSnap => {
     const team = docSnap.data();
     teamsCache[docSnap.id] = team;
 
     const btn = document.createElement("button");
     btn.className = "team-btn";
     btn.textContent = team.name;
-    btn.onclick = () => selectTeam(docSnap.id, btn);
+    btn.onclick = () => {
+      document.querySelectorAll(".team-btn").forEach(b => b.classList.remove("selected"));
+      btn.classList.add("selected");
+      selectedTeamId = docSnap.id;
+      soldBtn.disabled = false;
+    };
+
     teamsGrid.appendChild(btn);
 
-    const players = team.players?.map(p => p.name).join(", ") || "—";
-    teamsTableBody.innerHTML += `
-      <tr>
-        <td>${team.name}</td>
-        <td>₹${team.budget}</td>
-        <td>${players}</td>
-      </tr>
+    const row = document.createElement("tr");
+    row.innerHTML = `
+      <td>${team.name}</td>
+      <td>₹${team.budget.toLocaleString()}</td>
+      <td>${team.players?.map(p => p.name).join(", ") || "—"}</td>
     `;
+    teamsTableBody.appendChild(row);
   });
 }
 
 /* =========================
-   SELECT TEAM
-========================= */
-function selectTeam(teamId, button) {
-  document.querySelectorAll(".team-btn").forEach(b => b.classList.remove("selected"));
-  button.classList.add("selected");
-
-  selectedTeamId = teamId;
-  soldBtn.disabled = false; // 🔓 now allowed
-}
-
-/* =========================
-   BID INCREMENT (NO TEAM REQUIRED)
-========================= */
-incrementBtn.onclick = () => {
-  if (currentBid < 50000) currentBid += 2000;
-  else if (currentBid < 100000) currentBid += 5000;
-  else currentBid += 10000;
-
-  bidDisplay.textContent = `₹${currentBid}`;
-};
-
-/* =========================
-   SOLD LOGIC
+   SOLD
 ========================= */
 soldBtn.onclick = async () => {
   if (!selectedTeamId) return;
-
-  const team = teamsCache[selectedTeamId];
-  const remaining = TOTAL_PLAYERS - (team.playersCount || 0);
-  const maxBid = team.budget - (remaining - 1) * BASE_PRICE;
-
-  if (currentBid > maxBid) {
-    alert("❌ Team cannot afford this bid");
-    return;
-  }
 
   await runTransaction(db, async tx => {
     const teamRef = doc(db, "teams", selectedTeamId);
     const playerRef = doc(db, "players", currentPlayerId);
 
     const t = (await tx.get(teamRef)).data();
+    const p = (await tx.get(playerRef)).data();
 
     tx.update(teamRef, {
       budget: t.budget - currentBid,
       playersCount: (t.playersCount || 0) + 1,
-      players: [...t.players, { name: currentPlayerData.name, price: currentBid }]
+      [`${p.gender}sCount`]: (t[`${p.gender}sCount`] || 0) + 1,
+      players: [...t.players, { name: p.name, price: currentBid }]
     });
 
     tx.update(playerRef, {
@@ -206,16 +201,15 @@ soldBtn.onclick = async () => {
     });
   });
 
-  soldBadge.classList.remove("hidden");
-
+  soldSound.play();
   setTimeout(async () => {
     await moveToNextPlayer();
     await loadCurrentPlayer();
-  }, 5000); // ⏳ wait for animation
+  }, 5000);
 };
 
 /* =========================
-   UNSOLD LOGIC (ALWAYS WORKS)
+   UNSOLD
 ========================= */
 unsoldBtn.onclick = async () => {
   await moveToNextPlayer();
@@ -223,24 +217,31 @@ unsoldBtn.onclick = async () => {
 };
 
 /* =========================
-   NEXT PLAYER (GIRLS FIRST)
+   NEXT PLAYER
 ========================= */
 async function moveToNextPlayer() {
-  const snap = await getDocs(query(collection(db, "players"), orderBy("__name__")));
+  const q = query(collection(db, "players"), orderBy("__name__"));
+  const snap = await getDocs(q);
   const players = snap.docs.map(d => ({ id: d.id, ...d.data() }));
 
-  const girls = players.filter(p => p.gender === "girl" && !p.sold);
-  const boys = players.filter(p => p.gender === "boy" && !p.sold);
-
-  const next = girls.length ? girls[0] : boys[0];
-  if (!next) {
-    alert("🎉 Auction Completed");
-    return;
+  const idx = players.findIndex(p => p.id === currentPlayerId);
+  for (let i = idx + 1; i < players.length; i++) {
+    if (!players[i].sold) {
+      await updateDoc(doc(db, "auction", "current"), { currentPlayerId: players[i].id });
+      return;
+    }
   }
+}
 
-  await updateDoc(doc(db, "auction", "current"), {
-    currentPlayerId: next.id
-  });
+/* =========================
+   STAR RENDER
+========================= */
+function renderStars(count, type) {
+  let html = "";
+  for (let i = 1; i <= 5; i++) {
+    html += `<span class="star ${i <= count ? type : ""}">★</span>`;
+  }
+  return html;
 }
 
 /* =========================
