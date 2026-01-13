@@ -246,51 +246,48 @@ unsoldBtn.onclick = async () => {
 async function moveToNextPlayer() {
   const auctionRef = doc(db, "auction", "current");
   const auctionSnap = await getDoc(auctionRef);
+
   let phase = auctionSnap.data().phase || "girls";
 
   const q = query(collection(db, "players"), orderBy("__name__"));
   const snap = await getDocs(q);
   const players = snap.docs.map(d => ({ id: d.id, ...d.data() }));
 
-  let eligible = players.filter(p =>
-    phase === "girls" ? p.gender === "girl" : p.gender === "boy"
+  /* ----------------------------
+     STEP 1: CHECK GIRLS PHASE
+  -----------------------------*/
+  const unsoldGirls = players.filter(
+    p => p.gender === "girl" && !p.sold
   );
 
-  let unsold = eligible.filter(p => !p.sold);
-
-  if (unsold.length === 0) {
-    if (phase === "girls") {
-      await updateDoc(auctionRef, { phase: "boys" });
-      return moveToNextPlayer();
-    } else {
-      alert("🎉 AUCTION COMPLETED");
-      return;
-    }
+  if (phase === "girls" && unsoldGirls.length === 0) {
+    // ✅ Switch phase
+    phase = "boys";
+    await updateDoc(auctionRef, { phase: "boys" });
   }
 
-  const idx = eligible.findIndex(p => p.id === currentPlayerId);
+  /* ----------------------------
+     STEP 2: PICK NEXT PLAYER
+  -----------------------------*/
+  const phasePlayers = players.filter(
+    p => p.gender === phase && !p.sold
+  );
 
-  for (let i = idx + 1; i < eligible.length; i++) {
-    if (!eligible[i].sold) {
-      await updateDoc(auctionRef, {
-        currentPlayerId: eligible[i].id
-      });
-      return;
-    }
+  if (phasePlayers.length === 0) {
+    alert("🎉 AUCTION COMPLETED!");
+    return;
   }
 
-  for (let i = 0; i <= idx; i++) {
-    if (!eligible[i].sold) {
-      await updateDoc(auctionRef, {
-        currentPlayerId: eligible[i].id
-      });
-      return;
-    }
-  }
+  // Always take FIRST unsold of phase
+  await updateDoc(auctionRef, {
+    currentPlayerId: phasePlayers[0].id
+  });
 }
+
 
 /* =========================
    INIT
 ========================= */
 loadCurrentPlayer();
+
 
