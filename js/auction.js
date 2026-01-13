@@ -42,7 +42,7 @@ const soldToEl = document.getElementById("soldTo");
 const soldPriceEl = document.getElementById("soldPrice");
 
 const soldSound = new Audio("assets/sounds/sold.mp3");
-soldSound.volume = 0.8;
+soldSound.volume = 0.9;
 
 /* =========================
    STATE
@@ -66,15 +66,11 @@ incrementBtn.onclick = () => {
   const inc = getIncrementAmount();
   currentBid += inc;
 
-  // Max bid safety (if team selected)
   if (selectedTeamId) {
     const team = teamsCache[selectedTeamId];
     const remaining = TOTAL_PLAYERS - (team.playersCount || 0);
     const maxBid = team.budget - (remaining - 1) * BASE_PRICE;
-
-    if (currentBid > maxBid) {
-      currentBid = maxBid;
-    }
+    if (currentBid > maxBid) currentBid = maxBid;
   }
 
   bidAmountEl.textContent = `₹${currentBid.toLocaleString()}`;
@@ -86,9 +82,14 @@ incrementBtn.onclick = () => {
 ========================= */
 async function loadCurrentPlayer() {
   const auctionSnap = await getDoc(doc(db, "auction", "current"));
-  if (!auctionSnap.exists()) return;
+  if (!auctionSnap.exists()) {
+    console.warn("No auction/current document");
+    return;
+  }
 
   currentPlayerId = auctionSnap.data().currentPlayerId;
+  if (!currentPlayerId) return;
+
   const playerSnap = await getDoc(doc(db, "players", currentPlayerId));
   if (!playerSnap.exists()) return;
 
@@ -104,11 +105,11 @@ async function loadCurrentPlayer() {
   basePriceEl.textContent = `Base Price: ₹${currentPlayerData.basePrice}`;
   roleEl.textContent = currentPlayerData.role;
 
-  // ⭐ Dynamic Stars
+  // Stars
   battingEl.innerHTML = renderStars(currentPlayerData.stats?.batting || 0, "bat");
   bowlingEl.innerHTML = renderStars(currentPlayerData.stats?.bowling || 0, "bowl");
 
-  // 🖼️ Player Image (FINAL FIX)
+  // Image (assets/images/tisha.jpeg)
   const firstName = currentPlayerData.name.split(" ")[0].toLowerCase();
   const imgPath = `assets/images/${firstName}.jpeg`;
 
@@ -132,9 +133,9 @@ async function loadCurrentPlayer() {
     soldInfo.classList.add("hidden");
   }
 
-  unsoldBtn.disabled = false;
-  soldBtn.disabled = true;
   selectedTeamId = null;
+  soldBtn.disabled = true;
+  unsoldBtn.disabled = false;
 
   await loadTeams();
 }
@@ -155,6 +156,7 @@ async function loadTeams() {
     const btn = document.createElement("button");
     btn.className = "team-btn";
     btn.textContent = team.name;
+
     btn.onclick = () => {
       document.querySelectorAll(".team-btn").forEach(b => b.classList.remove("selected"));
       btn.classList.add("selected");
@@ -202,6 +204,7 @@ soldBtn.onclick = async () => {
   });
 
   soldSound.play();
+
   setTimeout(async () => {
     await moveToNextPlayer();
     await loadCurrentPlayer();
@@ -227,7 +230,9 @@ async function moveToNextPlayer() {
   const idx = players.findIndex(p => p.id === currentPlayerId);
   for (let i = idx + 1; i < players.length; i++) {
     if (!players[i].sold) {
-      await updateDoc(doc(db, "auction", "current"), { currentPlayerId: players[i].id });
+      await updateDoc(doc(db, "auction", "current"), {
+        currentPlayerId: players[i].id
+      });
       return;
     }
   }
