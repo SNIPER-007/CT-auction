@@ -22,10 +22,8 @@ const BASE_PRICE = 10000;
 ========================= */
 const teamsGrid = document.getElementById("teamsGrid");
 const teamsTableBody = document.getElementById("teamsTableBody");
-
 const bidDisplay = document.getElementById("bidDisplay");
 const incrementBtn = document.getElementById("incrementBtn");
-
 const soldBtn = document.querySelector(".sold-btn");
 const unsoldBtn = document.querySelector(".unsold-btn");
 
@@ -65,7 +63,7 @@ function updateBidUI() {
   incrementBtn.textContent = `+ ₹${getIncrementStep().toLocaleString()}`;
 }
 
-incrementBtn.addEventListener("click", () => {
+incrementBtn.onclick = () => {
   currentBid += getIncrementStep();
 
   if (selectedTeamId) {
@@ -74,27 +72,23 @@ incrementBtn.addEventListener("click", () => {
     const maxBid = team.budget - (remaining - 1) * BASE_PRICE;
     if (currentBid > maxBid) currentBid = maxBid;
   }
-
   updateBidUI();
-});
+};
 
 /* =========================
-   STAR RENDER
+   STARS
 ========================= */
-function renderStars(val, cls) {
-  let html = "";
-  for (let i = 1; i <= 5; i++) {
-    html += `<span class="star ${i <= val ? cls : "muted"}">★</span>`;
-  }
-  return html;
+function renderStars(v, cls) {
+  return Array.from({ length: 5 }, (_, i) =>
+    `<span class="star ${i < v ? cls : "muted"}">★</span>`
+  ).join("");
 }
 
 /* =========================
    LOAD PLAYER
 ========================= */
 async function loadCurrentPlayer() {
-  const auctionRef = doc(db, "auction", "current");
-  const auctionSnap = await getDoc(auctionRef);
+  const auctionSnap = await getDoc(doc(db, "auction", "current"));
   if (!auctionSnap.exists()) return;
 
   currentPlayerId = auctionSnap.data().currentPlayerId;
@@ -117,18 +111,11 @@ async function loadCurrentPlayer() {
   bowlingEl.innerHTML = renderStars(stats.bowling || 0, "bowl");
 
   const first = currentPlayerData.name.split(" ")[0].toLowerCase();
-  const imgPath = `assets/images/${first}.jpeg`;
-
-  const img = new Image();
-  img.onload = () => (playerPhotoEl.style.backgroundImage = `url('${imgPath}')`);
-  img.onerror = () =>
-    (playerPhotoEl.style.backgroundImage =
-      "url('assets/images/default.jpeg')");
-  img.src = imgPath;
+  playerPhotoEl.style.backgroundImage =
+    `url('assets/images/${first}.jpeg'), url('assets/images/default.jpeg')`;
 
   soldBtn.disabled = true;
   unsoldBtn.disabled = false;
-
   soldBadge.classList.add("hidden");
   soldInfo.classList.add("hidden");
 
@@ -154,9 +141,7 @@ async function loadTeams() {
     btn.textContent = team.name;
 
     btn.onclick = () => {
-      document.querySelectorAll(".team-btn").forEach(b =>
-        b.classList.remove("selected")
-      );
+      document.querySelectorAll(".team-btn").forEach(b => b.classList.remove("selected"));
       btn.classList.add("selected");
       selectedTeamId = d.id;
       soldBtn.disabled = false;
@@ -168,7 +153,7 @@ async function loadTeams() {
     row.innerHTML = `
       <td>${team.name}</td>
       <td>₹${team.budget.toLocaleString()}</td>
-      <td>${team.players?.map(p => p.name).join(", ") || "—"}</td>
+      <td>${(team.players || []).map(p => p.name).join(", ") || "—"}</td>
     `;
     teamsTableBody.appendChild(row);
   });
@@ -188,12 +173,13 @@ soldBtn.onclick = async () => {
     const player = (await tx.get(playerRef)).data();
     if (player.sold) return;
 
+    const safePlayers = Array.isArray(team.players) ? team.players : [];
+
     tx.update(teamRef, {
       budget: team.budget - currentBid,
       playersCount: (team.playersCount || 0) + 1,
-      [`${player.gender}sCount`]:
-        (team[`${player.gender}sCount`] || 0) + 1,
-      players: [...team.players, { name: player.name, price: currentBid }]
+      [`${player.gender}sCount`]: (team[`${player.gender}sCount`] || 0) + 1,
+      players: [...safePlayers, { name: player.name, price: currentBid }]
     });
 
     tx.update(playerRef, {
@@ -210,7 +196,7 @@ soldBtn.onclick = async () => {
   setTimeout(async () => {
     await moveToNextPlayer();
     await loadCurrentPlayer();
-  }, 1000);
+  }, 800);
 };
 
 /* =========================
@@ -222,37 +208,28 @@ unsoldBtn.onclick = async () => {
 };
 
 /* =========================
-   NEXT PLAYER (FINAL, SAFE)
+   NEXT PLAYER (BULLETPROOF)
 ========================= */
 async function moveToNextPlayer() {
   const auctionRef = doc(db, "auction", "current");
   const auctionSnap = await getDoc(auctionRef);
-
   let phase = auctionSnap.data().phase || "girls";
 
-  const snap = await getDocs(
-    query(collection(db, "players"), orderBy("__name__"))
-  );
+  const snap = await getDocs(query(collection(db, "players"), orderBy("__name__")));
   const players = snap.docs.map(d => ({ id: d.id, ...d.data() }));
 
-  // switch phase only once
-  const girlsLeft = players.some(
-    p => p.gender === "girl" && p.sold !== true
-  );
-
+  const girlsLeft = players.some(p => p.gender === "girl" && !p.sold);
   if (phase === "girls" && !girlsLeft) {
     phase = "boys";
     await updateDoc(auctionRef, { phase: "boys" });
   }
 
-  const eligible = players.filter(
-    p => p.gender === phase && p.sold !== true
+  const next = players.find(
+    p => p.gender === phase && !p.sold && p.id !== currentPlayerId
   );
 
-  if (eligible.length > 0) {
-    await updateDoc(auctionRef, {
-      currentPlayerId: eligible[0].id
-    });
+  if (next) {
+    await updateDoc(auctionRef, { currentPlayerId: next.id });
   }
 }
 
