@@ -469,3 +469,11 @@ th {
   text-shadow: 0 0 6px rgba(255, 215, 0, 0.6);
 }
 
+.auction-phase {
+  text-align: center;
+  margin-top: 6px;
+  font-size: 14px;
+  font-weight: 600;
+  color: #ff77aa; /* pink for girls, JS will change later */
+}
+
