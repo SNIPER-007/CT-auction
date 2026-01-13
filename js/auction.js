@@ -277,10 +277,7 @@ async function moveToNextPlayer() {
     p => p.gender === phase && p.sold !== true
   );
 
-  if (eligible.length === 0) {
-    alert("🎉 AUCTION COMPLETED!");
-    return;
-  }
+  
 
   /* =========================
      SET NEXT PLAYER (NO LOOP, NO INDEX)
@@ -289,10 +286,14 @@ async function moveToNextPlayer() {
     currentPlayerId: eligible[0].id
   });
 }
-
+if (eligible.length === 0) {
+    alert("🎉 AUCTION COMPLETED!");
+    return;
+  }
 
 /* =========================
    INIT
 ========================= */
 loadCurrentPlayer();
+
 
