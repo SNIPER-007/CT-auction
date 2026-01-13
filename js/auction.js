@@ -251,43 +251,44 @@ async function moveToNextPlayer() {
 
   const q = query(collection(db, "players"), orderBy("__name__"));
   const snap = await getDocs(q);
-  const players = snap.docs.map(d => ({ id: d.id, ...d.data() }));
 
-  /* ----------------------------
-     STEP 1: CHECK GIRLS PHASE
-  -----------------------------*/
+  const players = snap.docs.map(d => ({
+    id: d.id,
+    ...d.data()
+  }));
+
+  // 1️⃣ Check unsold girls
   const unsoldGirls = players.filter(
-    p => p.gender === "girl" && !p.sold
+    p => p.gender === "girl" && p.sold !== true
   );
 
   if (phase === "girls" && unsoldGirls.length === 0) {
-    // ✅ Switch phase
-    phase = "boys";
+    // 🔁 Switch phase
     await updateDoc(auctionRef, { phase: "boys" });
+    phase = "boys";
   }
 
-  /* ----------------------------
-     STEP 2: PICK NEXT PLAYER
-  -----------------------------*/
-  const phasePlayers = players.filter(
-    p => p.gender === phase && !p.sold
+  // 2️⃣ Get eligible players for current phase
+  const eligible = players.filter(
+    p => p.gender === phase && p.sold !== true
   );
 
-  if (phasePlayers.length === 0) {
+  // 3️⃣ End auction ONLY if both phases empty
+  if (eligible.length === 0) {
     alert("🎉 AUCTION COMPLETED!");
     return;
   }
 
-  // Always take FIRST unsold of phase
+  // 4️⃣ Always move to FIRST unsold player of phase
   await updateDoc(auctionRef, {
-    currentPlayerId: phasePlayers[0].id
+    currentPlayerId: eligible[0].id
   });
 }
-
 
 /* =========================
    INIT
 ========================= */
 loadCurrentPlayer();
+
 
 
