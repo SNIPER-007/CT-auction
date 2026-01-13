@@ -257,38 +257,45 @@ async function moveToNextPlayer() {
     ...d.data()
   }));
 
-  // 1️⃣ Check unsold girls
+  /* =========================
+     CHECK GIRLS LEFT
+  ========================= */
   const unsoldGirls = players.filter(
     p => p.gender === "girl" && p.sold !== true
   );
 
   if (phase === "girls" && unsoldGirls.length === 0) {
-    // 🔁 Switch phase
-    await updateDoc(auctionRef, { phase: "boys" });
+    // 🔁 SWITCH PHASE
     phase = "boys";
+    await updateDoc(auctionRef, { phase: "boys" });
   }
 
-  // 2️⃣ Get eligible players for current phase
+  /* =========================
+     GET ELIGIBLE FOR CURRENT PHASE
+  ========================= */
   const eligible = players.filter(
     p => p.gender === phase && p.sold !== true
   );
 
-  // 3️⃣ End auction ONLY if both phases empty
   if (eligible.length === 0) {
     alert("🎉 AUCTION COMPLETED!");
     return;
   }
 
-  // 4️⃣ Always move to FIRST unsold player of phase
+  /* =========================
+     SET NEXT PLAYER (NO LOOP, NO INDEX)
+  ========================= */
   await updateDoc(auctionRef, {
     currentPlayerId: eligible[0].id
   });
 }
 
+
 /* =========================
    INIT
 ========================= */
 loadCurrentPlayer();
+
 
 
 
