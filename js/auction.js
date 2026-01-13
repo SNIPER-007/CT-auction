@@ -18,7 +18,7 @@ const TOTAL_PLAYERS = 9;
 const BASE_PRICE = 10000;
 
 /* =========================
-   DOM ELEMENTS (SAFE)
+   DOM ELEMENTS
 ========================= */
 const teamsGrid = document.getElementById("teamsGrid");
 const teamsTableBody = document.getElementById("teamsTableBody");
@@ -38,8 +38,6 @@ const playerPhotoEl = document.querySelector(".player-photo");
 
 const soldBadge = document.getElementById("soldBadge");
 const soldInfo = document.getElementById("soldInfo");
-const soldToEl = document.getElementById("soldTo");
-const soldPriceEl = document.getElementById("soldPrice");
 
 const soldSound = new Audio("assets/sounds/sold.mp3");
 soldSound.volume = 0.9;
@@ -52,10 +50,9 @@ let teamsCache = {};
 let currentPlayerId = null;
 let currentPlayerData = null;
 let currentBid = BASE_PRICE;
-let auctionPhase = "girls"; // girls → boys
 
 /* =========================
-   INCREMENT LOGIC
+   BID LOGIC
 ========================= */
 function getIncrementStep() {
   if (currentBid < 50000) return 2000;
@@ -64,50 +61,43 @@ function getIncrementStep() {
 }
 
 function updateBidUI() {
-  bidDisplay && (bidDisplay.textContent = `₹${currentBid.toLocaleString()}`);
-  incrementBtn &&
-    (incrementBtn.textContent = `+ ₹${getIncrementStep().toLocaleString()}`);
+  bidDisplay.textContent = `₹${currentBid.toLocaleString()}`;
+  incrementBtn.textContent = `+ ₹${getIncrementStep().toLocaleString()}`;
 }
 
-incrementBtn &&
-  incrementBtn.addEventListener("click", () => {
-    currentBid += getIncrementStep();
+incrementBtn.addEventListener("click", () => {
+  currentBid += getIncrementStep();
 
-    // Budget cap only if team selected
-    if (selectedTeamId) {
-      const team = teamsCache[selectedTeamId];
-      if (team) {
-        const remaining = TOTAL_PLAYERS - (team.playersCount || 0);
-        const maxBid = team.budget - (remaining - 1) * BASE_PRICE;
-        if (currentBid > maxBid) currentBid = maxBid;
-      }
-    }
-    updateBidUI();
-  });
+  if (selectedTeamId) {
+    const team = teamsCache[selectedTeamId];
+    const remaining = TOTAL_PLAYERS - (team.playersCount || 0);
+    const maxBid = team.budget - (remaining - 1) * BASE_PRICE;
+    if (currentBid > maxBid) currentBid = maxBid;
+  }
+
+  updateBidUI();
+});
 
 /* =========================
    STAR RENDER
 ========================= */
-function renderStars(count, cls) {
+function renderStars(val, cls) {
   let html = "";
   for (let i = 1; i <= 5; i++) {
-    html += `<span class="star ${i <= count ? cls : "muted"}">★</span>`;
+    html += `<span class="star ${i <= val ? cls : "muted"}">★</span>`;
   }
   return html;
 }
 
 /* =========================
-   LOAD CURRENT PLAYER
+   LOAD PLAYER
 ========================= */
 async function loadCurrentPlayer() {
   const auctionRef = doc(db, "auction", "current");
   const auctionSnap = await getDoc(auctionRef);
   if (!auctionSnap.exists()) return;
 
-  const data = auctionSnap.data();
-  currentPlayerId = data.currentPlayerId;
-  auctionPhase = data.phase || "girls";
-
+  currentPlayerId = auctionSnap.data().currentPlayerId;
   if (!currentPlayerId) return;
 
   const playerSnap = await getDoc(doc(db, "players", currentPlayerId));
@@ -118,39 +108,29 @@ async function loadCurrentPlayer() {
   selectedTeamId = null;
   currentBid = currentPlayerData.basePrice || BASE_PRICE;
 
-  playerNameEl.textContent = currentPlayerData.name || "-";
+  playerNameEl.textContent = currentPlayerData.name;
   basePriceEl.textContent = `Base Price: ₹${currentBid}`;
   roleEl.textContent = currentPlayerData.role || "-";
 
-// ⭐ SAFE stats extraction (VERY IMPORTANT)
-const stats = currentPlayerData.stats || {};
+  const stats = currentPlayerData.stats || {};
+  battingEl.innerHTML = renderStars(stats.batting || 0, "bat");
+  bowlingEl.innerHTML = renderStars(stats.bowling || 0, "bowl");
 
-const batting =
-  typeof stats.batting === "number" ? stats.batting : 0;
+  const first = currentPlayerData.name.split(" ")[0].toLowerCase();
+  const imgPath = `assets/images/${first}.jpeg`;
 
-const bowling =
-  typeof stats.bowling === "number" ? stats.bowling : 0;
-
-battingEl.innerHTML = renderStars(batting, "bat");
-bowlingEl.innerHTML = renderStars(bowling, "bowl");
-
-
-  // PHOTO
-  const firstName = currentPlayerData.name.split(" ")[0].toLowerCase();
-  const imgPath = `assets/images/${firstName}.jpeg`;
   const img = new Image();
-  img.onload = () => {
-    playerPhotoEl.style.backgroundImage = `url('${imgPath}')`;
-    playerPhotoEl.textContent = "";
-  };
-  img.onerror = () => {
-    playerPhotoEl.style.backgroundImage = `url('assets/images/default.jpeg')`;
-    playerPhotoEl.textContent = "NO PHOTO";
-  };
+  img.onload = () => (playerPhotoEl.style.backgroundImage = `url('${imgPath}')`);
+  img.onerror = () =>
+    (playerPhotoEl.style.backgroundImage =
+      "url('assets/images/default.jpeg')");
   img.src = imgPath;
 
   soldBtn.disabled = true;
   unsoldBtn.disabled = false;
+
+  soldBadge.classList.add("hidden");
+  soldInfo.classList.add("hidden");
 
   updateBidUI();
   await loadTeams();
@@ -165,9 +145,9 @@ async function loadTeams() {
   teamsTableBody.innerHTML = "";
   teamsCache = {};
 
-  snap.forEach(docSnap => {
-    const team = docSnap.data();
-    teamsCache[docSnap.id] = team;
+  snap.forEach(d => {
+    const team = d.data();
+    teamsCache[d.id] = team;
 
     const btn = document.createElement("button");
     btn.className = "team-btn";
@@ -178,7 +158,7 @@ async function loadTeams() {
         b.classList.remove("selected")
       );
       btn.classList.add("selected");
-      selectedTeamId = docSnap.id;
+      selectedTeamId = d.id;
       soldBtn.disabled = false;
     };
 
@@ -211,7 +191,8 @@ soldBtn.onclick = async () => {
     tx.update(teamRef, {
       budget: team.budget - currentBid,
       playersCount: (team.playersCount || 0) + 1,
-      [`${player.gender}sCount`]: (team[`${player.gender}sCount`] || 0) + 1,
+      [`${player.gender}sCount`]:
+        (team[`${player.gender}sCount`] || 0) + 1,
       players: [...team.players, { name: player.name, price: currentBid }]
     });
 
@@ -229,7 +210,7 @@ soldBtn.onclick = async () => {
   setTimeout(async () => {
     await moveToNextPlayer();
     await loadCurrentPlayer();
-  }, 5000);
+  }, 1000);
 };
 
 /* =========================
@@ -241,7 +222,7 @@ unsoldBtn.onclick = async () => {
 };
 
 /* =========================
-   NEXT PLAYER (PHASE LOGIC)
+   NEXT PLAYER (FINAL, SAFE)
 ========================= */
 async function moveToNextPlayer() {
   const auctionRef = doc(db, "auction", "current");
@@ -249,51 +230,33 @@ async function moveToNextPlayer() {
 
   let phase = auctionSnap.data().phase || "girls";
 
-  const q = query(collection(db, "players"), orderBy("__name__"));
-  const snap = await getDocs(q);
+  const snap = await getDocs(
+    query(collection(db, "players"), orderBy("__name__"))
+  );
+  const players = snap.docs.map(d => ({ id: d.id, ...d.data() }));
 
-  const players = snap.docs.map(d => ({
-    id: d.id,
-    ...d.data()
-  }));
-
-  /* =========================
-     CHECK GIRLS LEFT
-  ========================= */
-  const unsoldGirls = players.filter(
+  // switch phase only once
+  const girlsLeft = players.some(
     p => p.gender === "girl" && p.sold !== true
   );
 
-  if (phase === "girls" && unsoldGirls.length === 0) {
-    // 🔁 SWITCH PHASE
+  if (phase === "girls" && !girlsLeft) {
     phase = "boys";
     await updateDoc(auctionRef, { phase: "boys" });
   }
 
-  /* =========================
-     GET ELIGIBLE FOR CURRENT PHASE
-  ========================= */
   const eligible = players.filter(
     p => p.gender === phase && p.sold !== true
   );
 
-  if (eligible.length === 0) {
-    alert("🎉 AUCTION COMPLETED!");
-    return;
+  if (eligible.length > 0) {
+    await updateDoc(auctionRef, {
+      currentPlayerId: eligible[0].id
+    });
   }
-
-  /* =========================
-     SET NEXT PLAYER (NO LOOP, NO INDEX)
-  ========================= */
-  await updateDoc(auctionRef, {
-    currentPlayerId: eligible[0].id
-  });
 }
 
 /* =========================
    INIT
 ========================= */
 loadCurrentPlayer();
-
-
-
