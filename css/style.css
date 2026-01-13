@@ -459,15 +459,22 @@ th {
 }
 
 .star {
-  color: #444;
-  font-size: 1.2rem;
-  margin-right: 2px;
+  font-size: 18px;
+  margin-right: 3px;
 }
 
-.star.filled {
-  color: gold;
-  text-shadow: 0 0 6px rgba(255, 215, 0, 0.6);
+.star.bat {
+  color: #ffb703; /* gold */
 }
+
+.star.bowl {
+  color: #4cc9f0; /* blue */
+}
+
+.star.muted {
+  color: rgba(255, 255, 255, 0.25);
+}
+
 
 .auction-phase {
   text-align: center;
@@ -476,4 +483,5 @@ th {
   font-weight: 600;
   color: #ff77aa; /* pink for girls, JS will change later */
 }
+
 
