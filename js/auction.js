@@ -52,6 +52,7 @@ let teamsCache = {};
 let currentPlayerId = null;
 let currentPlayerData = null;
 let currentBid = BASE_PRICE;
+let auctionPhase = "girls"; // girls → boys
 
 /* =========================
    INCREMENT LOGIC
@@ -63,20 +64,16 @@ function getIncrementStep() {
 }
 
 function updateBidUI() {
-  if (bidDisplay) {
-    bidDisplay.textContent = `₹${currentBid.toLocaleString()}`;
-  }
-  if (incrementBtn) {
-    incrementBtn.textContent = `+ ₹${getIncrementStep().toLocaleString()}`;
-  }
+  bidDisplay && (bidDisplay.textContent = `₹${currentBid.toLocaleString()}`);
+  incrementBtn &&
+    (incrementBtn.textContent = `+ ₹${getIncrementStep().toLocaleString()}`);
 }
 
-if (incrementBtn) {
-  incrementBtn.disabled = false; // ✅ ALWAYS ENABLED
+incrementBtn &&
   incrementBtn.addEventListener("click", () => {
     currentBid += getIncrementStep();
 
-    // Max bid protection ONLY if team selected
+    // Budget cap only if team selected
     if (selectedTeamId) {
       const team = teamsCache[selectedTeamId];
       if (team) {
@@ -85,18 +82,16 @@ if (incrementBtn) {
         if (currentBid > maxBid) currentBid = maxBid;
       }
     }
-
     updateBidUI();
   });
-}
 
 /* =========================
-   STAR RENDER (SAFE)
+   STAR RENDER
 ========================= */
-function renderStars(count, colorClass) {
+function renderStars(count, cls) {
   let html = "";
   for (let i = 1; i <= 5; i++) {
-    html += `<span class="star ${i <= count ? colorClass : "muted"}">★</span>`;
+    html += `<span class="star ${i <= count ? cls : "muted"}">★</span>`;
   }
   return html;
 }
@@ -105,10 +100,14 @@ function renderStars(count, colorClass) {
    LOAD CURRENT PLAYER
 ========================= */
 async function loadCurrentPlayer() {
-  const auctionSnap = await getDoc(doc(db, "auction", "current"));
+  const auctionRef = doc(db, "auction", "current");
+  const auctionSnap = await getDoc(auctionRef);
   if (!auctionSnap.exists()) return;
 
-  currentPlayerId = auctionSnap.data().currentPlayerId;
+  const data = auctionSnap.data();
+  currentPlayerId = data.currentPlayerId;
+  auctionPhase = data.phase || "girls";
+
   if (!currentPlayerId) return;
 
   const playerSnap = await getDoc(doc(db, "players", currentPlayerId));
@@ -116,51 +115,37 @@ async function loadCurrentPlayer() {
 
   currentPlayerData = playerSnap.data();
 
-  // Reset state
   selectedTeamId = null;
   currentBid = currentPlayerData.basePrice || BASE_PRICE;
 
-  // Text
-  if (playerNameEl) playerNameEl.textContent = currentPlayerData.name || "-";
-  if (basePriceEl) basePriceEl.textContent = `Base Price: ₹${currentPlayerData.basePrice || BASE_PRICE}`;
-  if (roleEl) roleEl.textContent = currentPlayerData.role || "-";
+  playerNameEl.textContent = currentPlayerData.name || "-";
+  basePriceEl.textContent = `Base Price: ₹${currentBid}`;
+  roleEl.textContent = currentPlayerData.role || "-";
 
-  // Stars from Firestore stats
-  const batting = currentPlayerData.stats?.batting || 0;
-  const bowling = currentPlayerData.stats?.bowling || 0;
+  battingEl.innerHTML = renderStars(
+    currentPlayerData.stats?.batting || 0,
+    "bat"
+  );
+  bowlingEl.innerHTML = renderStars(
+    currentPlayerData.stats?.bowling || 0,
+    "bowl"
+  );
 
-  if (battingEl) battingEl.innerHTML = renderStars(batting, "bat");
-  if (bowlingEl) bowlingEl.innerHTML = renderStars(bowling, "bowl");
+  // PHOTO
+  const firstName = currentPlayerData.name.split(" ")[0].toLowerCase();
+  const imgPath = `assets/images/${firstName}.jpeg`;
+  const img = new Image();
+  img.onload = () => {
+    playerPhotoEl.style.backgroundImage = `url('${imgPath}')`;
+    playerPhotoEl.textContent = "";
+  };
+  img.onerror = () => {
+    playerPhotoEl.style.backgroundImage = `url('assets/images/default.jpeg')`;
+    playerPhotoEl.textContent = "NO PHOTO";
+  };
+  img.src = imgPath;
 
-  // PHOTO: assets/images/tisha.jpeg
-  if (playerPhotoEl) {
-    const firstName = currentPlayerData.name.split(" ")[0].toLowerCase();
-    const imgPath = `assets/images/${firstName}.jpeg`;
-
-    const img = new Image();
-    img.onload = () => {
-      playerPhotoEl.style.backgroundImage = `url('${imgPath}')`;
-      playerPhotoEl.textContent = "";
-    };
-    img.onerror = () => {
-      playerPhotoEl.style.backgroundImage = `url('assets/images/default.jpeg')`;
-      playerPhotoEl.textContent = "NO PHOTO";
-    };
-    img.src = imgPath;
-  }
-
-  // SOLD UI (GUARDED)
-  if (currentPlayerData.sold) {
-    soldBadge?.classList.remove("hidden");
-    soldInfo?.classList.remove("hidden");
-    if (soldToEl) soldToEl.textContent = currentPlayerData.soldTo || "";
-    if (soldPriceEl) soldPriceEl.textContent = currentPlayerData.soldPrice || "";
-  } else {
-    soldBadge?.classList.add("hidden");
-    soldInfo?.classList.add("hidden");
-  }
-
-  soldBtn.disabled = true;   // ❌ until team selected
+  soldBtn.disabled = true;
   unsoldBtn.disabled = false;
 
   updateBidUI();
@@ -180,21 +165,21 @@ async function loadTeams() {
     const team = docSnap.data();
     teamsCache[docSnap.id] = team;
 
-    // Team select button
     const btn = document.createElement("button");
     btn.className = "team-btn";
     btn.textContent = team.name;
 
     btn.onclick = () => {
-      document.querySelectorAll(".team-btn").forEach(b => b.classList.remove("selected"));
+      document.querySelectorAll(".team-btn").forEach(b =>
+        b.classList.remove("selected")
+      );
       btn.classList.add("selected");
       selectedTeamId = docSnap.id;
-      soldBtn.disabled = false; // ✅ ENABLE SOLD
+      soldBtn.disabled = false;
     };
 
     teamsGrid.appendChild(btn);
 
-    // Summary table
     const row = document.createElement("tr");
     row.innerHTML = `
       <td>${team.name}</td>
@@ -208,7 +193,7 @@ async function loadTeams() {
 /* =========================
    SOLD
 ========================= */
-soldBtn.addEventListener("click", async () => {
+soldBtn.onclick = async () => {
   if (!selectedTeamId) return;
 
   await runTransaction(db, async tx => {
@@ -234,37 +219,66 @@ soldBtn.addEventListener("click", async () => {
   });
 
   soldSound.play();
-  soldBadge?.classList.remove("hidden");
-  soldInfo?.classList.remove("hidden");
+  soldBadge.classList.remove("hidden");
+  soldInfo.classList.remove("hidden");
 
   setTimeout(async () => {
     await moveToNextPlayer();
     await loadCurrentPlayer();
   }, 5000);
-});
+};
 
 /* =========================
    UNSOLD
 ========================= */
-unsoldBtn.addEventListener("click", async () => {
+unsoldBtn.onclick = async () => {
   await moveToNextPlayer();
   await loadCurrentPlayer();
-});
+};
 
 /* =========================
-   NEXT PLAYER
+   NEXT PLAYER (PHASE LOGIC)
 ========================= */
 async function moveToNextPlayer() {
+  const auctionRef = doc(db, "auction", "current");
+  const auctionSnap = await getDoc(auctionRef);
+  let phase = auctionSnap.data().phase || "girls";
+
   const q = query(collection(db, "players"), orderBy("__name__"));
   const snap = await getDocs(q);
   const players = snap.docs.map(d => ({ id: d.id, ...d.data() }));
 
-  const idx = players.findIndex(p => p.id === currentPlayerId);
+  let eligible = players.filter(p =>
+    phase === "girls" ? p.gender === "girl" : p.gender === "boy"
+  );
 
-  for (let i = idx + 1; i < players.length; i++) {
-    if (!players[i].sold) {
-      await updateDoc(doc(db, "auction", "current"), {
-        currentPlayerId: players[i].id
+  let unsold = eligible.filter(p => !p.sold);
+
+  if (unsold.length === 0) {
+    if (phase === "girls") {
+      await updateDoc(auctionRef, { phase: "boys" });
+      return moveToNextPlayer();
+    } else {
+      alert("🎉 AUCTION COMPLETED");
+      return;
+    }
+  }
+
+  const idx = eligible.findIndex(p => p.id === currentPlayerId);
+
+  for (let i = idx + 1; i < eligible.length; i++) {
+    if (!eligible[i].sold) {
+      await updateDoc(auctionRef, {
+        currentPlayerId: eligible[i].id
+      });
+      return;
+    }
+  }
+
+  for (let i = 0; i <= idx; i++) {
+    if (!eligible[i].sold) {
+      await updateDoc(auctionRef, {
+        currentPlayerId: eligible[i].id
       });
       return;
     }
