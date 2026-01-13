@@ -122,14 +122,18 @@ async function loadCurrentPlayer() {
   basePriceEl.textContent = `Base Price: ₹${currentBid}`;
   roleEl.textContent = currentPlayerData.role || "-";
 
-  battingEl.innerHTML = renderStars(
-    currentPlayerData.stats?.batting || 0,
-    "bat"
-  );
-  bowlingEl.innerHTML = renderStars(
-    currentPlayerData.stats?.bowling || 0,
-    "bowl"
-  );
+// ⭐ SAFE stats extraction (VERY IMPORTANT)
+const stats = currentPlayerData.stats || {};
+
+const batting =
+  typeof stats.batting === "number" ? stats.batting : 0;
+
+const bowling =
+  typeof stats.bowling === "number" ? stats.bowling : 0;
+
+battingEl.innerHTML = renderStars(batting, "bat");
+bowlingEl.innerHTML = renderStars(bowling, "bowl");
+
 
   // PHOTO
   const firstName = currentPlayerData.name.split(" ")[0].toLowerCase();
@@ -289,3 +293,4 @@ async function moveToNextPlayer() {
    INIT
 ========================= */
 loadCurrentPlayer();
+
